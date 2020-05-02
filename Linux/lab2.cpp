@@ -1,87 +1,93 @@
-﻿#include <iostream>
+﻿
+#include <iostream>
 #include <csignal>
 #include <vector>
 #include <unistd.h>
+#include "conio.h"
 
-bool canPrint = true;
-int processIndex = 0;
+#define FROM_CHILD SIGUSR1
+#define FROM_PARENT SIGUSR2
+
+bool writable = true;
+unsigned currentWritingIndex = 0;
 std::vector<pid_t> pidsVector;
 
-void processManager(int sigNum) {
-    if (sigNum == SIGUSR1) {
-        if (canPrint) {
-            canPrint = false;
-        } else {
-            if(++processIndex >= pidsVector.size())
-                processIndex = 0;
-        }
-        kill(pidsVector.at(processIndex), SIGUSR2);
-    }
+void signalHandler(int signal) {
+    switch (signal) {
+        case FROM_CHILD:
+            if (writable) {
+                writable = false;
+            } else {
+                if (++currentWritingIndex >= pidsVector.size())
+                    currentWritingIndex = 0;
+            }
+            kill(pidsVector.at(currentWritingIndex), FROM_PARENT);
+            break;
 
-    if (sigNum == SIGUSR2) {
-        canPrint = true;
+        case FROM_PARENT:
+            writable = true;
+            break;
+        default:;
     }
 }
 
-void childPrint() {
+void child() {
     std::string pid = std::to_string(getpid());
-    while(1) {
-        canPrint = false;
-        kill(getppid(),SIGUSR1);
-        while(!canPrint) {
+    while (true) {
+
+        writable = false;
+        kill(getppid(), FROM_CHILD);
+        while (!writable) {
             sleep(1);
         }
-        std::cout << "Pid : ";
-        for(int i = 0;i < pid.size();i++) {
-            std::cout << pid[i];
-            sleep(1);
+        for (char i : pid) {
+            printf("%c", i);
+            usleep(10000);
         }
-        std::cout << std::endl;
+        printf("\n");
     }
 }
 
-int main()
-{
-    struct sigaction sa;
-    sa.sa_handler = processManager;
-    sigaction(SIGUSR2, &sa, 0);
-    sigaction(SIGUSR1, &sa, 0);
-    std::cout << "\"+\" : create process\n\"-\" : delete last process\n\"q\" : close programm" << std::endl;
-    canPrint = true;
+int main() {
+    struct sigaction sa{};
+    sa.sa_handler = signalHandler;
+    sigaction(FROM_PARENT, &sa, nullptr);
+    sigaction(FROM_CHILD, &sa, nullptr);
     while (true) {
-        char c = std::cin.get();
-        std::cin.clear();
-        switch (c) {
-            case '+':
-                switch (int pid = fork()) {
-                    case -1:
-                        std::cout << "Error." << std::endl;
-                        exit(1);
-                    case 0:
-                        childPrint();
-                        break;
-                    default:
-                        pidsVector.push_back(pid);
-                        break;
-                }
-                break;
-            case '-':
-                if (!pidsVector.empty()) {
-                    kill(pidsVector.at(pidsVector.size() - 1), SIGTERM);
-                    pidsVector.pop_back();
-                    if (pidsVector.empty()) {
-                        std::cout << "No more processes running, enter \"+\" to add new one." << std::endl;
+        while (kbhit()) {
+            switch (getch_(0)) {
+                case '+':          
+                    switch (int pid = fork()) {
+                        case -1:
+                            std::cout << "Error." << std::endl;
+                            exit(1);
+                        case 0:
+                            child();
+                            break;
+                        default:
+                            pidsVector.push_back(pid);
+                            break;
                     }
-                } else {
-                    std::cout << "No processes running." << std::endl;
-                }
-                break;
-            case 'q':
-                while (!pidsVector.empty()) {
-                    kill(pidsVector.at(pidsVector.size() - 1), SIGTERM);
-                    pidsVector.pop_back();
-                }
-                exit(0);
+                    break;
+                case '-':
+                    if (!pidsVector.empty()) {
+                        kill(pidsVector.at(pidsVector.size() - 1), SIGTERM);
+                        pidsVector.pop_back();
+                        if (pidsVector.empty()) {
+                            std::cout << R"(No processes running.)"
+                                      << std::endl;
+                        }
+                    } else {
+                        std::cout << R"(No processes running.)" << std::endl;
+                    }
+                    break;
+                case 'q':
+                    while (!pidsVector.empty()) {
+                        kill(pidsVector.at(pidsVector.size() - 1), SIGTERM);
+                        pidsVector.pop_back();
+                    }
+                    exit(0);
+            }
         }
     }
 }
