@@ -22,7 +22,7 @@ char message[80] = { '\0' };
 
 void* writeThread(void* information)
 {
-    std::string filePath = "/home/imperator/CLionProjects/untitled/files/Result.txt";
+    std::string filePath = "C:/Users/abutg/source/repos/lab5Spovm/lab5Spovm/0_File.txt";
     int size = 0;
     int offset = 0;
 
@@ -47,7 +47,7 @@ void* writeThread(void* information)
 
 void* readThread(void* information)
 {
-    std::string filePath = "/home/imperator/CLionProjects/untitled/files/0_File.txt";
+    std::string filePath = "C:/Users/abutg/source/repos/lab5Spovm/lab5Spovm/0_File.txt";
     bool flagFirst = true;
 
     auto readTestFile = (readFunction)dlsym(hModuleDLL, "ReadTestFile");
@@ -88,7 +88,7 @@ void* readThread(void* information)
 
 int main()
 {
-    hModuleDLL = dlopen("/home/imperator/CLionProjects/untitled/lib.so", RTLD_LAZY);
+    hModuleDLL = dlopen("C:/Users/abutg/source/repos/lab5Spovm/lab5Spovm/mylib.dll", RTLD_LAZY);
 
     pthread_mutex_init(&writeMutex, nullptr);
     pthread_mutex_init(&readMutex, nullptr);
